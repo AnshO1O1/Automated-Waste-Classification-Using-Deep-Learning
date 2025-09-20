@@ -22,7 +22,7 @@ api_key = st.sidebar.text_input("Enter your Gemini API Key", type="password")
 # --- Model Loading ---
 # Use a dictionary to map model names to their file paths
 MODEL_PATHS = {
-    "MobileNetV2": os.path.join("models", "waste_mobilenet.h5"),
+    "MobileNetV2": os.path.join("models", "waste_classifier_mobilenet.h5"),
     "EfficientNetB0": os.path.join("models", "waste_efficientnet.h5"),
     "ResNet50V2": os.path.join("models", "waste_resnet.h5")
 }
