@@ -61,7 +61,6 @@ def load_model_weights(model_path):
         return None
     try:
         model.load_weights(model_path)
-        st.success("✅ Model loaded successfully with weights!")
         return model
     except Exception as e:
         st.error(f"❌ Could not load weights: {e}")
