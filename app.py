@@ -19,7 +19,7 @@ NUM_CLASSES = 6
 CLASS_NAMES = ["cardboard", "glass", "metal", "paper", "plastic", "trash"]
 
 # ------------------------
-# Grok API Key
+# Groq API Key
 # ------------------------
 api_key = st.secrets.get("API", "")  # Use "API" in secrets.toml
 
@@ -61,6 +61,7 @@ def load_model_weights(model_path):
         return None
     try:
         model.load_weights(model_path)
+        st.success("✅ Model loaded successfully with weights!")
         return model
     except Exception as e:
         st.error(f"❌ Could not load weights: {e}")
@@ -92,13 +93,13 @@ def predict(image: Image.Image):
     return CLASS_NAMES[idx], confidence
 
 # ------------------------
-# Grok API Integration
+# Groq API Integration
 # ------------------------
-def get_recycling_tips_grok(waste_category, api_key):
+def get_recycling_tips_groq(waste_category, api_key):
     if not api_key:
-        return "Grok API Key not configured. Add it to `.streamlit/secrets.toml` as API = 'YOUR_KEY_HERE'."
+        return "Groq API Key not configured. Add it to `.streamlit/secrets.toml` as API = 'YOUR_KEY_HERE'."
 
-    url = "https://api.groq.com/openai/v1/chat/completions"  # Grok endpoint
+    url = "https://api.groq.com/openai/v1/chat/completions"  # Groq endpoint
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json"
@@ -107,7 +108,7 @@ def get_recycling_tips_grok(waste_category, api_key):
     prompt = f"Provide three short, actionable, and easy-to-follow recycling tips for '{waste_category}' waste. Use bullet points."
 
     payload = {
-        "model": "grok-16k",  # Grok model
+        "model": "grok-16k",  # Groq model
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.7
     }
@@ -119,12 +120,12 @@ def get_recycling_tips_grok(waste_category, api_key):
         tips = result["choices"][0]["message"]["content"]
         return tips
     except Exception as e:
-        return f"Error fetching tips from Grok API: {e}"
+        return f"Error fetching tips from Groq API: {e}"
 
 # ------------------------
 # Streamlit UI
 # ------------------------
-st.title("♻️ Waste Classifier + Recycling Tips (MobileNetV2 + Grok)")
+st.title("♻️ Waste Classifier + Recycling Tips (MobileNetV2 + Groq)")
 
 uploaded_file = st.file_uploader("Upload Image", type=["jpg","jpeg","png"])
 
@@ -138,7 +139,7 @@ if uploaded_file is not None:
 
         st.subheader(f"♻️ Recycling Tips for {label.capitalize()}")
         with st.spinner("Generating tips..."):
-            tips = get_recycling_tips_grok(label, api_key)
+            tips = get_recycling_tips_groq(label, api_key)
             st.markdown(tips)
     else:
         st.error("Prediction not available. Please check your model weights.")
