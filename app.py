@@ -19,9 +19,9 @@ NUM_CLASSES = 6
 CLASS_NAMES = ["cardboard", "glass", "metal", "paper", "plastic", "trash"]
 
 # ------------------------
-# Gemini API Key
+# Grok API Key
 # ------------------------
-api_key = "API"
+api_key = st.secrets.get("API", "")  # Use "API" in secrets.toml
 
 # ------------------------
 # Build MobileNetV2 Model
@@ -93,30 +93,39 @@ def predict(image: Image.Image):
     return CLASS_NAMES[idx], confidence
 
 # ------------------------
-# Gemini LLM Integration
+# Grok API Integration
 # ------------------------
-def get_recycling_tips(waste_category, api_key):
+def get_recycling_tips_grok(waste_category, api_key):
     if not api_key:
-        return "Gemini API Key is not configured. Add it to `.streamlit/secrets.toml` to enable tips."
+        return "Grok API Key not configured. Add it to `.streamlit/secrets.toml` as API = 'YOUR_KEY_HERE'."
 
-    api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key={api_key}"
+    url = "https://api.openai.com/v1/chat/completions"  # Grok endpoint
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+
     prompt = f"Provide three short, actionable, and easy-to-follow recycling tips for '{waste_category}' waste. Use bullet points."
-    payload = {"contents": [{"parts": [{"text": prompt}]}]}
-    headers = {"Content-Type": "application/json"}
+
+    payload = {
+        "model": "grok-16k",  # Grok model
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.7
+    }
 
     try:
-        response = requests.post(api_url, headers=headers, json=payload, timeout=30)
+        response = requests.post(url, headers=headers, json=payload, timeout=30)
         response.raise_for_status()
         result = response.json()
-        tips = result['candidates'][0]['content']['parts'][0]['text']
+        tips = result["choices"][0]["message"]["content"]
         return tips
     except Exception as e:
-        return f"Error fetching tips: {e}"
+        return f"Error fetching tips from Grok API: {e}"
 
 # ------------------------
 # Streamlit UI
 # ------------------------
-st.title("♻️ Waste Classifier + Recycling Tips (MobileNetV2)")
+st.title("♻️ Waste Classifier + Recycling Tips (MobileNetV2 + Grok)")
 
 uploaded_file = st.file_uploader("Upload Image", type=["jpg","jpeg","png"])
 
@@ -130,7 +139,7 @@ if uploaded_file is not None:
 
         st.subheader(f"♻️ Recycling Tips for {label.capitalize()}")
         with st.spinner("Generating tips..."):
-            tips = get_recycling_tips(label, api_key)
+            tips = get_recycling_tips_grok(label, api_key)
             st.markdown(tips)
     else:
         st.error("Prediction not available. Please check your model weights.")
