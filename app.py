@@ -17,15 +17,15 @@ st.set_page_config(
 # For local development, you can set it as an environment variable or directly here.
 # For this example, we'll allow the user to input it in the sidebar.
 st.sidebar.header("API Configuration")
-api_key = st.sidebar.text_input("Enter your Gemini API Key", type="password")
+api_key = "API"
 
 # --- Model Loading ---
 # Use a dictionary to map model names to their file paths
 MODEL_PATHS = {
-    "MobileNetV2": os.path.join("models", "waste_classifier_mobilenet.h5"),
-    "EfficientNetB0": os.path.join("models", "waste_efficientnet.h5"),
-    "ResNet50V2": os.path.join("models", "waste_resnet.h5")
-}
+    "MobileNetV2": "waste_classifier_mobilenet.h5"}
+   # "EfficientNetB0": "waste_efficientnet.h5",
+   # "ResNet50V2": "waste_resnet.h5"
+
 
 # Cache the model loading to improve performance
 @st.cache_resource
