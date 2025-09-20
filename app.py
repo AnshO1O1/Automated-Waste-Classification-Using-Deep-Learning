@@ -1,121 +1,75 @@
 import streamlit as st
 import tensorflow as tf
-from PIL import Image
 import numpy as np
+from PIL import Image
 import os
-import requests
-from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
 
-# --- Page Configuration ---
-st.set_page_config(
-    page_title="Automated Waste Classifier",
-    page_icon="♻️",
-    layout="centered"
-)
+# ------------------------
+# Path to your trained model
+# ------------------------
+MODEL_PATH = "waste_classifier_mobilenet.h5"
 
-# --- Secure API Key Configuration ---
-api_key = st.secrets.get("API", "")
-
-# --- Model Path ---
-# Try to use .keras (preferred). If not found, fallback to .h5
-MODEL_PATH = "waste_classifier_mobilenet.keras"
-if not os.path.exists(MODEL_PATH):
-    MODEL_PATH = "waste_classifier_mobilenet.h5"
-
-# --- Class Names ---
-class_names = {
-    0: 'cardboard',
-    1: 'glass',
-    2: 'metal',
-    3: 'paper',
-    4: 'plastic',
-    5: 'trash'
-}
-
-# --- Cache Model Loading ---
+# ------------------------
+# Load Model
+# ------------------------
 @st.cache_resource
 def load_model(model_path):
     if not os.path.exists(model_path):
-        st.error(f"Model file not found at {model_path}. Please make sure the model file is in the same directory.")
+        st.error(f"Model file not found at {model_path}. Please upload/keep it in the same folder.")
         return None
     try:
-        # Load full model (ignore optimizer state)
-        model = tf.keras.models.load_model(model_path, compile=False)
+        model = tf.keras.models.load_model(model_path, compile=False)  # load full model
         return model
     except Exception as e:
-        st.error(f"Error loading model: {e}")
+        st.error(f"❌ Error loading model: {e}")
         return None
 
-# --- Image Preprocessing ---
-def preprocess_image(image, target_size=(224, 224)):
-    if image.mode != "RGB":
-        image = image.convert("RGB")
-    image = image.resize(target_size)
-    image_array = np.asarray(image)
-    image_array = np.expand_dims(image_array, axis=0)
-    return preprocess_input(image_array)
-
-# --- LLM Integration for Recycling Tips ---
-def get_recycling_tips(waste_category, api_key):
-    if not api_key:
-        return "Gemini API Key is not configured. Please add it to your `.streamlit/secrets.toml` file."
-
-    api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key={api_key}"
-    prompt = f"Provide three short, actionable, and easy-to-follow recycling tips for '{waste_category}' waste. Use bullet points."
-    payload = {"contents": [{"parts": [{"text": prompt}]}]}
-    headers = {"Content-Type": "application/json"}
-
-    try:
-        response = requests.post(api_url, headers=headers, json=payload, timeout=30)
-        response.raise_for_status()
-        result = response.json()
-        tips = result['candidates'][0]['content']['parts'][0]['text']
-        return tips
-    except Exception as e:
-        return f"Error with Gemini API: {e}"
-
-# --- Main Application UI ---
-st.title("♻️ Automated Waste Classification")
-st.markdown("Leveraging Deep Learning and Generative AI to promote effective recycling.")
-
-if not api_key:
-    st.warning(
-        "The Gemini API key is not configured. Please add `API = 'YOUR_KEY_HERE'` to your `.streamlit/secrets.toml` file.",
-        icon="🔑"
-    )
-
-# Load model
 model = load_model(MODEL_PATH)
 
-if model is not None:
-    st.success(f"Model loaded successfully from '{os.path.basename(MODEL_PATH)}'!")
+# ------------------------
+# Class Names (adjust these to your dataset)
+# ------------------------
+CLASS_NAMES = ["cardboard", "glass", "metal", "paper", "plastic", "trash"]
 
-    # File uploader
-    uploaded_file = st.file_uploader("Upload an image of a waste item", type=["jpg", "jpeg", "png"])
+# ------------------------
+# Image Preprocessing
+# ------------------------
+def preprocess_image(image: Image.Image):
+    image = image.convert("RGB")  # ensure 3 channels
+    image = image.resize((224, 224))  # MobileNet input size
+    img_array = tf.keras.utils.img_to_array(image)
+    img_array = np.expand_dims(img_array, axis=0)  # add batch dimension
+    img_array = tf.keras.applications.mobilenet_v2.preprocess_input(img_array)
+    return img_array
 
-    if uploaded_file is not None:
-        col1, col2 = st.columns(2)
+# ------------------------
+# Prediction Function
+# ------------------------
+def predict(image: Image.Image):
+    if model is None:
+        return None, None
 
-        with col1:
-            st.image(uploaded_file, caption="Uploaded Image", use_column_width=True)
+    processed = preprocess_image(image)
+    preds = model.predict(processed)
+    class_idx = np.argmax(preds, axis=1)[0]
+    confidence = float(np.max(tf.nn.softmax(preds)))
+    return CLASS_NAMES[class_idx], confidence
 
-        # Preprocess image
-        image = Image.open(uploaded_file)
-        processed_image = preprocess_image(image)
+# ------------------------
+# Streamlit UI
+# ------------------------
+st.title("♻️ Waste Classifier using MobileNet")
+st.write("Upload an image of waste, and the model will classify it into categories.")
 
-        # Prediction
-        with st.spinner("Classifying..."):
-            prediction = model.predict(processed_image)
-            predicted_class_index = np.argmax(prediction)
-            predicted_class_name = class_names.get(predicted_class_index, "Unknown")
-            confidence = np.max(prediction) * 100
+uploaded_file = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"])
 
-        with col2:
-            st.success(f"**Prediction:** {predicted_class_name.capitalize()}")
-            st.info(f"**Confidence:** {confidence:.2f}%")
+if uploaded_file is not None:
+    image = Image.open(uploaded_file)
+    st.image(image, caption="Uploaded Image", use_container_width=True)
 
-        # Recycling Tips
-        st.subheader(f"Recycling Tips for {predicted_class_name.capitalize()}", divider="rainbow")
-        with st.spinner("Generating tips with Gemini..."):
-            tips = get_recycling_tips(predicted_class_name, api_key)
-            st.markdown(tips)
+    if model is not None:
+        label, confidence = predict(image)
+        if label:
+            st.success(f"✅ Predicted: **{label}** with confidence {confidence:.2f}")
+    else:
+        st.error("Model could not be loaded. Please check your `.h5` file.")
