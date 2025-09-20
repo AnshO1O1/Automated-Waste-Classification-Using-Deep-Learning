@@ -13,18 +13,14 @@ st.set_page_config(
 )
 
 # --- Gemini API Configuration ---
-# IMPORTANT: It's recommended to use st.secrets for API keys in deployed apps
-# For local development, you can set it as an environment variable or directly here.
-# For this example, we'll allow the user to input it in the sidebar.
-st.sidebar.header("API Configuration")
+# The API key is hardcoded for development.
+# For deployment, it is strongly recommended to use st.secrets.
 api_key = "API"
 
-# --- Model Loading ---
-# Use a dictionary to map model names to their file paths
-MODEL_PATHS = {
-    "MobileNetV2": "waste_classifier_mobilenet.h5"}
-   # "EfficientNetB0": "waste_efficientnet.h5",
-   # "ResNet50V2": "waste_resnet.h5"
+
+# --- Model Path ---
+# The model is expected to be in the same directory as this script.
+MODEL_PATH = "waste_classifier_mobilenet.h5"
 
 
 # Cache the model loading to improve performance
@@ -32,7 +28,7 @@ MODEL_PATHS = {
 def load_model(model_path):
     """Loads a Keras model from the specified path."""
     if not os.path.exists(model_path):
-        st.error(f"Model file not found at {model_path}. Please make sure the model files are in the 'models' directory.")
+        st.error(f"Model file not found at '{model_path}'. Please make sure the model is in the same directory as this script.")
         return None
     try:
         model = tf.keras.models.load_model(model_path)
@@ -49,16 +45,14 @@ def preprocess_image(image, target_size=(224, 224)):
     image = image.resize(target_size)
     image_array = np.asarray(image)
     image_array = np.expand_dims(image_array, axis=0)
-    # The preprocessing function depends on the model.
-    # For simplicity, we'll use a generic scaling here.
-    # For best results, use the specific preprocess_input for each model.
+    # Scale pixels to the [0, 1] range
     return image_array / 255.0
 
 # --- LLM Integration for Recycling Tips ---
 def get_recycling_tips(waste_category, api_key):
     """Calls the Gemini API to get recycling tips."""
     if not api_key:
-        return "Please enter a Gemini API Key in the sidebar to get recycling tips."
+        return "Gemini API Key is not configured. Please add it to your Streamlit secrets to enable this feature."
     
     # Use the gemini-2.5-flash-preview-05-20 model
     api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key={api_key}"
@@ -66,11 +60,7 @@ def get_recycling_tips(waste_category, api_key):
     prompt = f"Provide three short, actionable, and easy-to-follow recycling tips for '{waste_category}' waste. Use bullet points."
     
     payload = {
-        "contents": [{
-            "parts": [{
-                "text": prompt
-            }]
-        }]
+        "contents": [{"parts": [{"text": prompt}]}]
     }
     
     headers = {
@@ -78,7 +68,7 @@ def get_recycling_tips(waste_category, api_key):
     }
 
     try:
-        response = requests.post(api_url, headers=headers, json=payload)
+        response = requests.post(api_url, headers=headers, json=payload, timeout=30)
         response.raise_for_status() # Raise an exception for bad status codes
         result = response.json()
         
@@ -88,26 +78,19 @@ def get_recycling_tips(waste_category, api_key):
     except requests.exceptions.RequestException as e:
         return f"Error calling the API: {e}. Please check your API key and network connection."
     except (KeyError, IndexError) as e:
-        return f"Error parsing API response. The response might not be in the expected format. Details: {e}"
+        return f"Error parsing API response: {e}. The response from the API was not in the expected format."
 
 
 # --- Main Application UI ---
 st.title("♻️ Automated Waste Classification")
 st.markdown("Leveraging Deep Learning and Generative AI to promote effective recycling.")
 
-# Sidebar for model selection
-st.sidebar.header("Model Selection")
-selected_model_name = st.sidebar.selectbox(
-    "Choose a classification model",
-    list(MODEL_PATHS.keys())
-)
+# Load the model
+model = load_model(MODEL_PATH)
 
-# Load the selected model
-model_path = MODEL_PATHS[selected_model_name]
-model = load_model(model_path)
-
+# Only show the uploader and the rest of the app if the model loaded successfully
 if model is not None:
-    st.sidebar.success(f"Successfully loaded **{selected_model_name}**.")
+    st.sidebar.success(f"Model loaded successfully!")
 
     # File uploader
     uploaded_file = st.file_uploader(
@@ -143,5 +126,3 @@ if model is not None:
         with st.spinner("Generating tips with Gemini..."):
             tips = get_recycling_tips(predicted_class_name, api_key)
             st.markdown(tips)
-else:
-    st.warning("Please place your trained models in a folder named 'models' in the same directory as the app.")
