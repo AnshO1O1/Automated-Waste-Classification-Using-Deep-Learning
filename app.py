@@ -17,7 +17,7 @@ st.set_page_config(
 # --- Secure API Key Configuration ---
 # Fetches the API key from st.secrets.toml. This is the secure way to handle keys.
 # The app will show a warning if the key is not found.
-api_key = st.secrets.get("GEMINI_API_KEY", "")
+api_key = st.secrets.get("API", "")
 
 
 # --- Model Path ---
