@@ -9,8 +9,11 @@ import numpy as np
 import os
 from groq import Groq
 
-# --- PAGE CONFIG ---
-st.set_page_config(page_title="♻️ Automated Waste Classifier", layout="centered")
+# --- PAGE CONFIGURATION ---
+st.set_page_config(
+    page_title="♻️ Waste Classifier + Recycling Tips",
+    layout="centered"
+)
 
 # --- SETTINGS ---
 MODEL_PATH = "waste_classifier_mobilenet.h5"
@@ -19,10 +22,10 @@ IMG_WIDTH = 224
 NUM_CLASSES = 6
 CLASS_NAMES = ["cardboard", "glass", "metal", "paper", "plastic", "trash"]
 
-# --- Groq API Key ---
+# --- Groq API Key from Streamlit Secrets ---
 GROQ_API_KEY = st.secrets.get("API", "")
 
-# --- BUILD MODEL ---
+# --- BUILD TRANSFER LEARNING MODEL ---
 @st.cache_resource
 def build_model():
     base_model = MobileNetV2(
@@ -31,7 +34,6 @@ def build_model():
         weights='imagenet'
     )
     base_model.trainable = False
-    # Fine-tune last 20 layers
     for layer in base_model.layers[-20:]:
         layer.trainable = True
 
@@ -41,7 +43,7 @@ def build_model():
         BatchNormalization(),
         Dense(64, activation='relu', kernel_regularizer=l2(0.001)),
         Dropout(0.5),
-        Dense(NUM_CLASSES, activation='softmax', name='output_layer', kernel_regularizer=l2(0.001))
+        Dense(NUM_CLASSES, activation='softmax', kernel_regularizer=l2(0.001))
     ])
     return model
 
@@ -81,7 +83,7 @@ def predict(image: Image.Image):
     confidence = float(np.max(preds))
     return CLASS_NAMES[idx], confidence
 
-# --- Groq API INTEGRATION ---
+# --- GROQ RECYCLING TIPS ---
 @st.cache_data
 def get_recycling_tips(waste_category, api_key):
     if not api_key:
@@ -90,17 +92,17 @@ def get_recycling_tips(waste_category, api_key):
         client = Groq(api_key=api_key)
         prompt = (
             f"You are an assistant providing short, actionable, and easy-to-follow recycling tips. "
-            f"Give 3 bullet points for '{waste_category}' waste."
+            f"Provide 3 bullet points for '{waste_category}' waste."
         )
-        completion = client.chat.completions.create(
+        chat_completion = client.chat.completions.create(
             messages=[{"role": "user", "content": prompt}],
-            model="llama3-8b-8192"
+            model="llama-3.3-70b-versatile"  # Updated model
         )
-        return completion.choices[0].message.content
+        return chat_completion.choices[0].message.content
     except Exception as e:
         return f"Error fetching tips from Groq API: {e}"
 
-# --- UI ---
+# --- STREAMLIT UI ---
 st.title("♻️ Automated Waste Classifier + Recycling Tips")
 
 uploaded_file = st.file_uploader("Upload an image of waste", type=["jpg","jpeg","png"])
