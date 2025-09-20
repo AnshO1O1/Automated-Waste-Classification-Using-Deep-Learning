@@ -2,7 +2,7 @@ import streamlit as st
 import tensorflow as tf
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import GlobalAveragePooling2D, Dense, Dropout, BatchNormalization
-from tensorflow.keras.applications import EfficientNetB0
+from tensorflow.keras.applications import MobileNetV2
 from tensorflow.keras.regularizers import l2
 from PIL import Image
 import numpy as np
@@ -17,8 +17,8 @@ st.set_page_config(
 )
 
 # --- SETTINGS ---
-MODEL_PATH = "waste_classifier_efficientnet.h5"  # <-- Update file name
-DRIVE_FILE_ID = "1tVjhrpLA7OzBa2FwymIq6JgxJnanYg6M"
+MODEL_PATH = "waste_classifier_mobilenet.h5"
+DRIVE_FILE_ID = "1tVjhrpLA7OzBa2FwymIq6JgxJnanYg6M"  # Your provided model file
 IMG_HEIGHT = 224
 IMG_WIDTH = 224
 NUM_CLASSES = 6
@@ -38,10 +38,10 @@ def download_model_from_drive(model_path, file_id):
         except Exception as e:
             st.error(f"❌ Failed to download model: {e}")
 
-# --- BUILD TRANSFER LEARNING MODEL (EfficientNetB0) ---
+# --- BUILD TRANSFER LEARNING MODEL (MobileNetV2) ---
 @st.cache_resource
 def build_model():
-    base_model = EfficientNetB0(
+    base_model = MobileNetV2(
         input_shape=(IMG_HEIGHT, IMG_WIDTH, 3),
         include_top=False,
         weights='imagenet'
@@ -49,8 +49,7 @@ def build_model():
     base_model.trainable = False
 
     # Fine-tune last 20 layers
-    fine_tune_at = len(base_model.layers) - 20
-    for layer in base_model.layers[fine_tune_at:]:
+    for layer in base_model.layers[-20:]:
         layer.trainable = True
 
     model = Sequential([
@@ -60,7 +59,7 @@ def build_model():
         Dense(64, activation='relu', kernel_regularizer=l2(0.001)),
         Dropout(0.5),
         Dense(NUM_CLASSES, activation='softmax', name='output_layer', kernel_regularizer=l2(0.001))
-    ], name="EfficientNetB0_Transfer_Learning")
+    ], name="MobileNetV2_Transfer_Learning")
     
     return model
 
@@ -88,7 +87,7 @@ def preprocess_image(image: Image.Image):
     image = image.resize((IMG_WIDTH, IMG_HEIGHT))
     img_array = tf.keras.utils.img_to_array(image)
     img_array = np.expand_dims(img_array, axis=0)
-    img_array = tf.keras.applications.efficientnet.preprocess_input(img_array)
+    img_array = tf.keras.applications.mobilenet_v2.preprocess_input(img_array)
     return img_array
 
 # --- PREDICTION ---
