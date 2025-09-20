@@ -14,10 +14,10 @@ st.set_page_config(
     layout="centered"
 )
 
-# --- Gemini API Configuration ---
-# The API key is hardcoded for development.
-# For deployment, it is strongly recommended to use st.secrets.
-api_key = "API"
+# --- Secure API Key Configuration ---
+# Fetches the API key from st.secrets.toml. This is the secure way to handle keys.
+# The app will show a warning if the key is not found.
+api_key = st.secrets.get("GEMINI_API_KEY", "")
 
 
 # --- Model Path ---
@@ -58,7 +58,7 @@ def preprocess_image(image, target_size=(224, 224)):
 def get_recycling_tips(waste_category, api_key):
     """Calls the Gemini API to get recycling tips."""
     if not api_key:
-        return "Gemini API Key is not configured. Please add it to your Streamlit secrets to enable this feature."
+        return "Gemini API Key is not configured. Please add it to your `.streamlit/secrets.toml` file to enable this feature."
     
     # Use the gemini-2.5-flash-preview-05-20 model
     api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key={api_key}"
@@ -91,6 +91,10 @@ def get_recycling_tips(waste_category, api_key):
 st.title("♻️ Automated Waste Classification")
 st.markdown("Leveraging Deep Learning and Generative AI to promote effective recycling.")
 
+# Show a warning if the API key is not configured.
+if not api_key:
+    st.warning("The Gemini API key is not configured. Please add `GEMINI_API_KEY = 'YOUR_KEY_HERE'` to your `.streamlit/secrets.toml` file to enable recycling tips.", icon="🔑")
+
 # Load the model
 model = load_model(MODEL_PATH)
 
@@ -114,14 +118,22 @@ if model is not None:
         image = Image.open(uploaded_file)
         processed_image = preprocess_image(image)
         
-        # IMPORTANT: These class names must be in the exact same order as the
-        # subdirectories in your training data folder (usually sorted alphabetically).
-        class_names = ['cardboard', 'glass', 'metal', 'paper', 'plastic', 'trash']
+        # IMPORTANT: This dictionary maps the model's output index to a class name.
+        # Ensure the indices (0, 1, 2, etc.) match the alphabetical order of your
+        # training data subdirectories (e.g., how `flow_from_directory` found them).
+        class_names = {
+            0: 'cardboard',
+            1: 'glass',
+            2: 'metal',
+            3: 'paper',
+            4: 'plastic',
+            5: 'trash'
+        }
 
         with st.spinner("Classifying..."):
             prediction = model.predict(processed_image)
             predicted_class_index = np.argmax(prediction)
-            predicted_class_name = class_names[predicted_class_index]
+            predicted_class_name = class_names.get(predicted_class_index, "Unknown")
             confidence = np.max(prediction) * 100
 
         with col2:
@@ -133,8 +145,4 @@ if model is not None:
         with st.spinner("Generating tips with Gemini..."):
             tips = get_recycling_tips(predicted_class_name, api_key)
             st.markdown(tips)
-
-
-
-
 
