@@ -4,7 +4,6 @@ from PIL import Image
 import numpy as np
 import os
 import requests
-from tensorflow.keras import layers, models
 from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
 
 # --- Page Configuration ---
@@ -18,7 +17,10 @@ st.set_page_config(
 api_key = st.secrets.get("API", "")
 
 # --- Model Path ---
-MODEL_PATH = "waste_classifier_mobilenet.h5"
+# Try to use .keras (preferred). If not found, fallback to .h5
+MODEL_PATH = "waste_classifier_mobilenet.keras"
+if not os.path.exists(MODEL_PATH):
+    MODEL_PATH = "waste_classifier_mobilenet.h5"
 
 # --- Class Names ---
 class_names = {
@@ -30,23 +32,6 @@ class_names = {
     5: 'trash'
 }
 
-# --- Rebuild Model Architecture ---
-def build_model(input_shape=(224, 224, 3), num_classes=len(class_names)):
-    base_model = tf.keras.applications.MobileNetV2(
-        input_shape=input_shape,
-        include_top=False,
-        weights=None
-    )
-    base_model.trainable = False
-
-    x = layers.GlobalAveragePooling2D()(base_model.output)
-    x = layers.Dense(128, activation="relu")(x)
-    x = layers.Dropout(0.3)(x)
-    output = layers.Dense(num_classes, activation="softmax")(x)
-
-    model = models.Model(inputs=base_model.input, outputs=output)
-    return model
-
 # --- Cache Model Loading ---
 @st.cache_resource
 def load_model(model_path):
@@ -54,8 +39,8 @@ def load_model(model_path):
         st.error(f"Model file not found at {model_path}. Please make sure the model file is in the same directory.")
         return None
     try:
-        model = build_model()
-        model.load_weights(model_path)
+        # Load full model (ignore optimizer state)
+        model = tf.keras.models.load_model(model_path, compile=False)
         return model
     except Exception as e:
         st.error(f"Error loading model: {e}")
@@ -94,23 +79,31 @@ st.title("♻️ Automated Waste Classification")
 st.markdown("Leveraging Deep Learning and Generative AI to promote effective recycling.")
 
 if not api_key:
-    st.warning("The Gemini API key is not configured. Please add `API = 'YOUR_KEY_HERE'` to your `.streamlit/secrets.toml` file.", icon="🔑")
+    st.warning(
+        "The Gemini API key is not configured. Please add `API = 'YOUR_KEY_HERE'` to your `.streamlit/secrets.toml` file.",
+        icon="🔑"
+    )
 
+# Load model
 model = load_model(MODEL_PATH)
 
 if model is not None:
-    st.success(f"Model weights loaded successfully from '{os.path.basename(MODEL_PATH)}'!")
+    st.success(f"Model loaded successfully from '{os.path.basename(MODEL_PATH)}'!")
 
+    # File uploader
     uploaded_file = st.file_uploader("Upload an image of a waste item", type=["jpg", "jpeg", "png"])
 
     if uploaded_file is not None:
         col1, col2 = st.columns(2)
+
         with col1:
             st.image(uploaded_file, caption="Uploaded Image", use_column_width=True)
 
+        # Preprocess image
         image = Image.open(uploaded_file)
         processed_image = preprocess_image(image)
 
+        # Prediction
         with st.spinner("Classifying..."):
             prediction = model.predict(processed_image)
             predicted_class_index = np.argmax(prediction)
@@ -121,6 +114,7 @@ if model is not None:
             st.success(f"**Prediction:** {predicted_class_name.capitalize()}")
             st.info(f"**Confidence:** {confidence:.2f}%")
 
+        # Recycling Tips
         st.subheader(f"Recycling Tips for {predicted_class_name.capitalize()}", divider="rainbow")
         with st.spinner("Generating tips with Gemini..."):
             tips = get_recycling_tips(predicted_class_name, api_key)
