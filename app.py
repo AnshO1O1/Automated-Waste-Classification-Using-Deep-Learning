@@ -61,7 +61,6 @@ def load_model_weights(model_path):
         return None
     try:
         model.load_weights(model_path)
-        st.success("✅ Model loaded successfully with weights!")
         return model
     except Exception as e:
         st.error(f"❌ Could not load weights: {e}")
@@ -99,7 +98,7 @@ def get_recycling_tips_grok(waste_category, api_key):
     if not api_key:
         return "Grok API Key not configured. Add it to `.streamlit/secrets.toml` as API = 'YOUR_KEY_HERE'."
 
-    url = "https://api.openai.com/v1/chat/completions"  # Grok endpoint
+    url = "https://api.groq.com/openai/v1/chat/completions"  # Grok endpoint
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json"
