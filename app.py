@@ -90,7 +90,7 @@ for the following type of waste: '{waste_category}'.
         return f"Error fetching tips from Groq API: {e}"
 
 # --- UI ---
-st.title("♻️ AI-based Waste Classifier + Recycling Tips")
+st.title("♻️ Automated Waste Classification ")
 
 uploaded_file = st.file_uploader("Upload an image of waste", type=["jpg", "jpeg", "png"])
 
