@@ -40,28 +40,33 @@ def download_model_from_drive(model_path, file_id):
 
 # --- BUILD TRANSFER LEARNING MODEL ---
 @st.cache_resource
+# Transfer Learning with EfficientNet + Fine-tuning
 def build_model():
-    inputs = Input(shape=(IMG_HEIGHT, IMG_WIDTH, 3))
     base_model = EfficientNetB0(
         input_shape=(IMG_HEIGHT, IMG_WIDTH, 3),
         include_top=False,
         weights='imagenet'
     )
-    base_model.trainable = False
+    base_model.trainable = False   # freeze all layers initially
 
-    # Fine-tune last 20 layers
-    for layer in base_model.layers[-20:]:
+    # -----------------------------
+    # Fine-tuning: unfreeze last 20 layers
+    # -----------------------------
+    fine_tune_at = len(base_model.layers) - 20
+    for layer in base_model.layers[fine_tune_at:]:
         layer.trainable = True
 
-    x = base_model(inputs)
-    x = GlobalAveragePooling2D()(x)
-    x = BatchNormalization()(x)
-    x = Dense(64, activation='relu', kernel_regularizer=l2(0.001))(x)
-    x = Dropout(0.5)(x)
-    outputs = Dense(NUM_CLASSES, activation='softmax', kernel_regularizer=l2(0.001))(x)
-    
-    model = Model(inputs=inputs, outputs=outputs, name="EfficientNetB0_Classifier")
+    model = Sequential([
+        base_model,
+        GlobalAveragePooling2D(),
+        BatchNormalization(),  # Add Batch Normalization after pooling
+        Dense(64, activation='relu', kernel_regularizer=l2(0.001)),  # Add L2 regularization
+        Dropout(0.5),
+        Dense(NUM_CLASSES, activation='softmax', name='output_layer', kernel_regularizer=l2(0.001))  # L2 on output as well
+        ], name="EfficientNetB0_Transfer_Learning")
     return model
+
+
 
 # --- LOAD MODEL AND WEIGHTS ---
 @st.cache_resource
