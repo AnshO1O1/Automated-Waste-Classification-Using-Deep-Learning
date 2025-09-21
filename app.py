@@ -17,8 +17,8 @@ st.set_page_config(
 )
 
 # --- SETTINGS ---
-MODEL_PATH = "trained_resnet_model.h5"
-DRIVE_FILE_ID = "1zG_6QvXZucGVv_C1cGmYHVsskAvc08am"  # Your ResNet model file ID
+MODEL_PATH = "waste_classifier_mobilenetv2.h5"
+
 IMG_HEIGHT = 224
 IMG_WIDTH = 224
 NUM_CLASSES = 6
@@ -27,16 +27,6 @@ CLASS_NAMES = ["cardboard", "glass", "metal", "paper", "plastic", "trash"]
 # --- API KEY FROM SECRETS ---
 GROQ_API_KEY = st.secrets.get("API", "")
 
-# --- DOWNLOAD MODEL FROM GOOGLE DRIVE ---
-def download_model_from_drive(model_path, file_id):
-    if not os.path.exists(model_path):
-        st.info("🔄 Downloading model weights from Google Drive...")
-        url = f"https://drive.google.com/uc?id={file_id}"
-        try:
-            gdown.download(url, model_path, quiet=False)
-            st.success("✅ Model downloaded successfully.")
-        except Exception as e:
-            st.error(f"❌ Failed to download model: {e}")
 
 # --- BUILD TRANSFER LEARNING MODEL (Your version) ---
 @st.cache_resource
@@ -66,7 +56,6 @@ def build_transfer_learning_model3():
 # --- LOAD MODEL + WEIGHTS ---
 @st.cache_resource
 def load_model():
-    download_model_from_drive(MODEL_PATH, DRIVE_FILE_ID)
     model = build_transfer_learning_model3()
     if not os.path.exists(MODEL_PATH):
         st.error(f"Model weights file not found at {MODEL_PATH}.")
