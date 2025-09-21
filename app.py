@@ -1,7 +1,7 @@
 import streamlit as st
 import tensorflow as tf
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import GlobalAveragePooling2D, Dense, Dropout, BatchNormalization
+from tensorflow.keras.models import Sequential, Model
+from tensorflow.keras.layers import GlobalAveragePooling2D, Dense, Dropout, BatchNormalization, Lambda, Input
 from tensorflow.keras.applications import EfficientNetB0
 from tensorflow.keras.regularizers import l2
 from PIL import Image
@@ -18,7 +18,7 @@ st.set_page_config(
 
 # --- SETTINGS ---
 MODEL_PATH = "trained_EN_model.h5"
-DRIVE_FILE_ID = "1tVjhrpLA7OzBa2FwymIq6JgxJnanYg6M"  # Your provided model file
+DRIVE_FILE_ID = "1tVjhrpLA7OzBa2FwymIq6JgxJnanYg6M"
 IMG_HEIGHT = 224
 IMG_WIDTH = 224
 NUM_CLASSES = 6
@@ -38,9 +38,15 @@ def download_model_from_drive(model_path, file_id):
         except Exception as e:
             st.error(f"❌ Failed to download model: {e}")
 
-# --- BUILD TRANSFER LEARNING MODEL (MobileNetV2) ---
+# --- BUILD TRANSFER LEARNING MODEL FOR GRAYSCALE INPUT ---
 @st.cache_resource
 def build_model():
+    # Input for grayscale images (1 channel)
+    inputs = Input(shape=(IMG_HEIGHT, IMG_WIDTH, 1))
+    
+    # Convert grayscale to RGB by repeating the channel 3 times
+    x = Lambda(lambda x: tf.repeat(x, 3, axis=-1))(inputs)
+    
     base_model = EfficientNetB0(
         input_shape=(IMG_HEIGHT, IMG_WIDTH, 3),
         include_top=False,
@@ -52,14 +58,14 @@ def build_model():
     for layer in base_model.layers[-20:]:
         layer.trainable = True
 
-    model = Sequential([
-        base_model,
-        GlobalAveragePooling2D(),
-        BatchNormalization(),
-        Dense(64, activation='relu', kernel_regularizer=l2(0.001)),
-        Dropout(0.5),
-        Dense(NUM_CLASSES, activation='softmax', name='output_layer', kernel_regularizer=l2(0.001))
-    ], name="MobileNetV2_Transfer_Learning")
+    x = base_model(x)
+    x = GlobalAveragePooling2D()(x)
+    x = BatchNormalization()(x)
+    x = Dense(64, activation='relu', kernel_regularizer=l2(0.001))(x)
+    x = Dropout(0.5)(x)
+    outputs = Dense(NUM_CLASSES, activation='softmax', kernel_regularizer=l2(0.001))(x)
+    
+    model = Model(inputs=inputs, outputs=outputs, name="EfficientNetB0_Grayscale")
     
     return model
 
@@ -81,13 +87,15 @@ def load_model_weights(model_path):
 
 model = load_model_weights(MODEL_PATH)
 
-# --- IMAGE PREPROCESSING ---
+# --- IMAGE PREPROCESSING FOR GRAYSCALE ---
 def preprocess_image(image: Image.Image):
-    image = image.convert("RGB")
+    # Convert to grayscale (1 channel)
+    image = image.convert("L")
     image = image.resize((IMG_WIDTH, IMG_HEIGHT))
     img_array = tf.keras.utils.img_to_array(image)
     img_array = np.expand_dims(img_array, axis=0)
-    img_array = tf.keras.applications.mobilenet_v2.preprocess_input(img_array)
+    # Normalize to [0, 1] (don't use EfficientNet preprocessing for grayscale)
+    img_array = img_array / 255.0
     return img_array
 
 # --- PREDICTION ---
