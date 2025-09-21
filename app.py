@@ -110,7 +110,7 @@ def get_recycling_tips(waste_category, api_key):
         prompt = f"""You are an expert environmental advisor. Provide **three short, actionable, and easy-to-follow recycling tips** 
 for the following type of waste: '{waste_category}'.
 - Use **bullet points** only.
-- Keep each tip **under 25 words**.
+- Keep each tip **under 50 words**.
 - Make the tips **practical** for households, offices, or small businesses.
 - Do not add any extra commentary or explanations outside the bullet points.
 - Focus on **reducing waste, proper sorting, and safe disposal or reuse**."""
