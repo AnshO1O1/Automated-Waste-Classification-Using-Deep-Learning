@@ -41,11 +41,9 @@ def download_model_from_drive(model_path, file_id):
 # --- BUILD TRANSFER LEARNING MODEL FOR GRAYSCALE INPUT ---
 @st.cache_resource
 def build_model():
-    # Input for grayscale images (1 channel)
-    inputs = Input(shape=(IMG_HEIGHT, IMG_WIDTH, 1))
+    # Input
+    x= Input(shape=(IMG_HEIGHT, IMG_WIDTH, 3))
     
-    # Convert grayscale to RGB by repeating the channel 3 times
-    x = Lambda(lambda x: tf.repeat(x, 3, axis=-1))(inputs)
     
     base_model = EfficientNetB0(
         input_shape=(IMG_HEIGHT, IMG_WIDTH, 3),
@@ -89,8 +87,7 @@ model = load_model_weights(MODEL_PATH)
 
 # --- IMAGE PREPROCESSING FOR GRAYSCALE ---
 def preprocess_image(image: Image.Image):
-    # Convert to grayscale (1 channel)
-    image = image.convert("L")
+
     image = image.resize((IMG_WIDTH, IMG_HEIGHT))
     img_array = tf.keras.utils.img_to_array(image)
     img_array = np.expand_dims(img_array, axis=0)
