@@ -5,6 +5,10 @@ import numpy as np
 import os
 import gdown
 from groq import Groq
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import GlobalAveragePooling2D, BatchNormalization, Dense, Dropout
+from tensorflow.keras.applications import EfficientNetB0
+from tensorflow.keras.regularizers import l2
 
 # --- Page config ---
 st.set_page_config(page_title="♻️ Waste Classifier + Recycling Tips", layout="centered")
@@ -15,10 +19,26 @@ DRIVE_FILE_ID = "1tVjhrpLA7OzBa2FwymIq6JgxJnanYg6M"
 IMG_HEIGHT, IMG_WIDTH = 224, 224
 CLASS_NAMES = ["cardboard", "glass", "metal", "paper", "plastic", "trash"]
 
+# --- Model building function ---
+def build_transfer_learning_model():
+    base_model = EfficientNetB0(
+        input_shape=(IMG_HEIGHT, IMG_WIDTH, 3),
+        include_top=False,
+        weights='imagenet'
+    )
+    base_model.trainable = False
+
+    model = Sequential([
+        base_model,
+        GlobalAveragePooling2D(),
+        BatchNormalization(),
+        Dense(64, activation='relu', kernel_regularizer=l2(0.001)),
+        Dropout(0.5),
+        Dense(len(CLASS_NAMES), activation='softmax', name='output_layer', kernel_regularizer=l2(0.001))
+    ], name="EfficientNetB0_Transfer_Learning")
+    return model
+
 # --- Groq API key from secrets ---
-# Ensure you have a secrets.toml file in a .streamlit folder with your API key
-# [API]
-# GROQ_API_KEY = "your-key-here"
 try:
     GROQ_API_KEY = st.secrets["API"]
 except (KeyError, FileNotFoundError):
@@ -26,7 +46,6 @@ except (KeyError, FileNotFoundError):
 
 # --- Download model from Drive if not exists ---
 def download_model():
-    """Downloads the model from Google Drive if it's not already present."""
     if not os.path.exists(MODEL_PATH):
         st.info("📥 Downloading classification model... (this may take a moment)")
         with st.spinner("Fetching model from Google Drive..."):
@@ -41,13 +60,15 @@ def download_model():
 # --- Load model ---
 @st.cache_resource
 def load_keras_model():
-    """Loads the Keras model into memory, caching it for performance."""
     download_model()
     try:
-        # The 'compile=False' argument can sometimes help with loading models
-        # where the custom optimizer/loss functions aren't needed for inference.
-        model = tf.keras.models.load_model(MODEL_PATH, compile=False)
-        # Re-compile the model if you need to evaluate metrics, but for prediction it's not essential.
+        # Build the model architecture first
+        model = build_transfer_learning_model()
+        
+        # Then load the weights
+        model.load_weights(MODEL_PATH)
+        
+        # Compile the model (optional for inference, but good practice)
         model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
         return model
     except Exception as e:
@@ -61,17 +82,15 @@ def load_keras_model():
 
 # --- Image preprocessing ---
 def preprocess_image(image: Image.Image):
-    """Converts a PIL Image to the format expected by the model."""
-    image = image.convert("RGB")  # Ensure image is in RGB format
+    image = image.convert("RGB")
     image = image.resize((IMG_WIDTH, IMG_HEIGHT))
     img_array = tf.keras.utils.img_to_array(image)
-    img_array = np.expand_dims(img_array, axis=0) # Create a batch
+    img_array = np.expand_dims(img_array, axis=0)
     img_array = tf.keras.applications.efficientnet.preprocess_input(img_array)
     return img_array
 
 # --- Prediction ---
 def predict(model, image: Image.Image):
-    """Makes a prediction on a given image."""
     if model is None:
         return None, None
     
@@ -87,7 +106,6 @@ def predict(model, image: Image.Image):
 # --- Groq recycling tips ---
 @st.cache_data
 def get_recycling_tips(waste_category: str, api_key: str):
-    """Fetches actionable recycling tips from the Groq API."""
     if not api_key:
         return "⚠️ Groq API Key not configured. Please add it to your Streamlit secrets."
     try:
@@ -119,22 +137,18 @@ model = load_keras_model()
 uploaded_file = st.file_uploader("📷 Choose an image...", type=["jpg", "jpeg", "png"])
 
 if uploaded_file is not None:
-    # Display the uploaded image
     image = Image.open(uploaded_file)
     st.image(image, caption="Uploaded Image", use_column_width=True)
 
-    # Perform prediction
     with st.spinner("🧠 Classifying the item..."):
         label, confidence = predict(model, image)
 
     if label:
         st.success(f"**Prediction:** `{label.capitalize()}` ({confidence*100:.2f}% confidence)")
 
-        # Fetch and display recycling tips
         st.subheader(f"♻️ Recycling Tips for {label.capitalize()}")
         with st.spinner("💬 Generating tips using Groq..."):
             tips = get_recycling_tips(label, GROQ_API_KEY)
             st.markdown(tips)
     else:
         st.error("⚠️ Prediction failed. Please try a different image or check the model file.")
-
