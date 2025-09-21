@@ -20,7 +20,7 @@ CLASS_NAMES = ["cardboard", "glass", "metal", "paper", "plastic", "trash"]
 # [API]
 # GROQ_API_KEY = "your-key-here"
 try:
-    GROQ_API_KEY = st.secrets["API"]["GROQ_API_KEY"]
+    GROQ_API_KEY = st.secrets["API"]
 except (KeyError, FileNotFoundError):
     GROQ_API_KEY = ""
 
