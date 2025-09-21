@@ -2,7 +2,7 @@ import streamlit as st
 import tensorflow as tf
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import GlobalAveragePooling2D, Dense, Dropout, BatchNormalization
-from tensorflow.keras.applications import ResNet50
+from tensorflow.keras.applications import MobileNetV2
 from tensorflow.keras.regularizers import l2
 from PIL import Image
 import numpy as np
@@ -31,7 +31,7 @@ GROQ_API_KEY = st.secrets.get("API", "")
 # --- BUILD TRANSFER LEARNING MODEL (Your version) ---
 @st.cache_resource
 def build_transfer_learning_model3():
-    base_model = ResNet50(
+    base_model = MobileNetV2(
         input_shape=(IMG_HEIGHT, IMG_WIDTH, 3),
         include_top=False,
         weights='imagenet'
