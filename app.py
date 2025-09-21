@@ -2,7 +2,7 @@ import streamlit as st
 import tensorflow as tf
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import GlobalAveragePooling2D, Dense, Dropout, BatchNormalization
-from tensorflow.keras.applications import MobileNetV2
+from tensorflow.keras.applications import EfficientNetB0
 from tensorflow.keras.regularizers import l2
 from PIL import Image
 import numpy as np
@@ -41,7 +41,7 @@ def download_model_from_drive(model_path, file_id):
 # --- BUILD TRANSFER LEARNING MODEL (MobileNetV2) ---
 @st.cache_resource
 def build_model():
-    base_model = MobileNetV2(
+    base_model = EfficientNetB0(
         input_shape=(IMG_HEIGHT, IMG_WIDTH, 3),
         include_top=False,
         weights='imagenet'
@@ -59,7 +59,7 @@ def build_model():
         Dense(64, activation='relu', kernel_regularizer=l2(0.001)),
         Dropout(0.5),
         Dense(NUM_CLASSES, activation='softmax', name='output_layer', kernel_regularizer=l2(0.001))
-    ], name="MobileNetV2_Transfer_Learning")
+    ], name="EfficientNetB0_Transfer_Learning")
     
     return model
 
