@@ -12,7 +12,7 @@ from groq import Groq
 
 # --- PAGE CONFIG ---
 st.set_page_config(
-    page_title="♻️ Waste Classifier (ResNet50 Transfer Learning)",
+    page_title="♻️ AI Waste Classifier",
     layout="centered"
 )
 
@@ -90,7 +90,7 @@ for the following type of waste: '{waste_category}'.
         return f"Error fetching tips from Groq API: {e}"
 
 # --- UI ---
-st.title("♻️ Waste Classifier (ResNet50 TL) + Recycling Tips")
+st.title("♻️ AI-based Waste Classifier + Recycling Tips")
 
 uploaded_file = st.file_uploader("Upload an image of waste", type=["jpg", "jpeg", "png"])
 
