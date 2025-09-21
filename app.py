@@ -40,7 +40,6 @@ def load_model():
         return None
     try:
         model = tf.keras.models.load_model(MODEL_PATH)
-        st.success("✅ Full model loaded successfully.")
         return model
     except Exception as e:
         st.error(f"❌ Failed to load model: {e}")
