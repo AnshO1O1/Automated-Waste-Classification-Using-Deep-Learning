@@ -20,33 +20,39 @@ IMG_HEIGHT, IMG_WIDTH = 224, 224
 CLASS_NAMES = ["cardboard", "glass", "metal", "paper", "plastic", "trash"]
 NUM_CLASSES = 6
 
-# --- Model building function (EXACTLY matches your training code) ---
+# --- Model building function for GRAYSCALE input (1 channel) ---
 def build_transfer_learning_model():
+    # Create input with 1 channel (grayscale) but convert to 3 channels for EfficientNet
+    inputs = tf.keras.Input(shape=(IMG_HEIGHT, IMG_WIDTH, 1))
+    
+    # Convert grayscale to RGB by repeating the channel 3 times
+    x = tf.keras.layers.Lambda(lambda x: tf.repeat(x, 3, axis=-1))(inputs)
+    
     base_model = EfficientNetB0(
-        input_shape=(IMG_HEIGHT, IMG_WIDTH, 3),  # 3 channels for RGB
+        input_shape=(IMG_HEIGHT, IMG_WIDTH, 3),
         include_top=False,
         weights='imagenet'
     )
-    base_model.trainable = False   # freeze all layers initially
+    base_model.trainable = False
 
     # Fine-tuning: unfreeze last 20 layers
     fine_tune_at = len(base_model.layers) - 20
     for layer in base_model.layers[fine_tune_at:]:
         layer.trainable = True
 
-    model = Sequential([
-        base_model,
-        GlobalAveragePooling2D(),
-        BatchNormalization(),
-        Dense(64, activation='relu', kernel_regularizer=l2(0.001)),
-        Dropout(0.5),
-        Dense(NUM_CLASSES, activation='softmax', name='output_layer', kernel_regularizer=l2(0.001))
-    ], name="EfficientNetB0_Transfer_Learning")
+    x = base_model(x)
+    x = GlobalAveragePooling2D()(x)
+    x = BatchNormalization()(x)
+    x = Dense(64, activation='relu', kernel_regularizer=l2(0.001))(x)
+    x = Dropout(0.5)(x)
+    outputs = Dense(NUM_CLASSES, activation='softmax', kernel_regularizer=l2(0.001))(x)
+    
+    model = tf.keras.Model(inputs=inputs, outputs=outputs, name="EfficientNetB0_Grayscale")
     return model
 
 # --- Groq API key from secrets ---
 try:
-    GROQ_API_KEY = st.secrets["API"]
+    GROQ_API_KEY = st.secrets["API"]["GROQ_API_KEY"]
 except (KeyError, FileNotFoundError):
     GROQ_API_KEY = ""
 
@@ -68,13 +74,13 @@ def download_model():
 def load_keras_model():
     download_model()
     try:
-        # Build the model architecture first (EXACT match with training)
+        # Build the model architecture first
         model = build_transfer_learning_model()
         
         # Then load the weights
         model.load_weights(MODEL_PATH)
         
-        # Compile the model (same as training)
+        # Compile the model
         model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
         return model
     except Exception as e:
@@ -86,20 +92,19 @@ def load_keras_model():
         """)
         return None
 
-# --- Image preprocessing for RGB (3 channels) ---
+# --- Image preprocessing for GRAYSCALE (1 channel) ---
 def preprocess_image(image: Image.Image):
-    """Converts a PIL Image to the format expected by the model."""
-    image = image.convert("RGB")  # Ensure image is in RGB format (3 channels)
+    # Convert to grayscale (1 channel)
+    image = image.convert("L")  # "L" mode for grayscale
     image = image.resize((IMG_WIDTH, IMG_HEIGHT))
     img_array = tf.keras.utils.img_to_array(image)
-    img_array = np.expand_dims(img_array, axis=0) # Create a batch
-    # Use EfficientNet's preprocessing
-    img_array = tf.keras.applications.efficientnet.preprocess_input(img_array)
+    img_array = np.expand_dims(img_array, axis=0)  # Create a batch
+    # Normalize to [0, 1] (don't use EfficientNet preprocessing for grayscale)
+    img_array = img_array / 255.0
     return img_array
 
 # --- Prediction ---
 def predict(model, image: Image.Image):
-    """Makes a prediction on a given image."""
     if model is None:
         return None, None
     
@@ -115,7 +120,6 @@ def predict(model, image: Image.Image):
 # --- Groq recycling tips ---
 @st.cache_data
 def get_recycling_tips(waste_category: str, api_key: str):
-    """Fetches actionable recycling tips from the Groq API."""
     if not api_key:
         return "⚠️ Groq API Key not configured. Please add it to your Streamlit secrets."
     try:
@@ -147,18 +151,16 @@ model = load_keras_model()
 uploaded_file = st.file_uploader("📷 Choose an image...", type=["jpg", "jpeg", "png"])
 
 if uploaded_file is not None:
-    # Display the uploaded image
     image = Image.open(uploaded_file)
+    # Display original color image
     st.image(image, caption="Uploaded Image", use_column_width=True)
 
-    # Perform prediction
     with st.spinner("🧠 Classifying the item..."):
         label, confidence = predict(model, image)
 
     if label:
         st.success(f"**Prediction:** `{label.capitalize()}` ({confidence*100:.2f}% confidence)")
 
-        # Fetch and display recycling tips
         st.subheader(f"♻️ Recycling Tips for {label.capitalize()}")
         with st.spinner("💬 Generating tips using Groq..."):
             tips = get_recycling_tips(label, GROQ_API_KEY)
