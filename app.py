@@ -13,15 +13,15 @@ import os
 import gdown
 from groq import Groq
 
-# --- PAGE CONFIG ---
+# --- Streamlit Page Config ---
 st.set_page_config(
     page_title="♻️ Waste Classifier + Recycling Tips",
     layout="centered"
 )
 
-# --- CONSTANTS ---
+# --- Constants ---
 MODEL_PATH = "efficientnet_waste_classifier.h5"
-DRIVE_FILE_ID = "your_drive_file_id_here"  # 🔁 Replace with actual file ID
+DRIVE_FILE_ID = "1tVjhrpLA7OzBa2FwymIq6JgxJnanYg6M"  # ✅ Your file ID from Google Drive
 IMG_HEIGHT = 224
 IMG_WIDTH = 224
 NUM_CLASSES = 6
@@ -30,18 +30,18 @@ CLASS_NAMES = ["cardboard", "glass", "metal", "paper", "plastic", "trash"]
 # --- Groq API Key ---
 GROQ_API_KEY = st.secrets.get("API", "")
 
-# --- Download model weights from Google Drive ---
+# --- Download Weights from Google Drive ---
 def download_model_from_drive(model_path, file_id):
     if not os.path.exists(model_path):
         st.info("🔄 Downloading model weights from Google Drive...")
-        url = f"https://drive.google.com/uc?id={file_id}"
         try:
+            url = f"https://drive.google.com/uc?id={file_id}"
             gdown.download(url, model_path, quiet=False)
             st.success("✅ Model downloaded successfully.")
         except Exception as e:
             st.error(f"❌ Failed to download model: {e}")
 
-# --- EfficientNetB0 Model Definition ---
+# --- Build EfficientNet Model ---
 @st.cache_resource
 def build_model():
     base_model = EfficientNetB0(
@@ -51,7 +51,7 @@ def build_model():
     )
     base_model.trainable = False
 
-    # Fine-tune last 20 layers
+    # Unfreeze last 20 layers for fine-tuning
     for layer in base_model.layers[-20:]:
         layer.trainable = True
 
@@ -76,16 +76,16 @@ def load_model_weights(model_path):
         return None
     try:
         model.load_weights(model_path)
-        st.success("✅ Model loaded successfully!")
+        st.success("✅ Model loaded successfully with weights!")
         return model
     except Exception as e:
-        st.error(f"❌ Could not load weights: {e}")
+        st.error(f"❌ Failed to load weights: {e}")
         return None
 
-# --- Load model once ---
+# --- Load the model once ---
 model = load_model_weights(MODEL_PATH)
 
-# --- Preprocess uploaded image ---
+# --- Image Preprocessing ---
 def preprocess_image(image: Image.Image):
     image = image.convert("RGB")
     image = image.resize((IMG_WIDTH, IMG_HEIGHT))
@@ -94,7 +94,7 @@ def preprocess_image(image: Image.Image):
     img_array = preprocess_input(img_array)
     return img_array
 
-# --- Predict waste type ---
+# --- Predict Waste Type ---
 def predict(image: Image.Image):
     if model is None:
         return None, None
@@ -104,7 +104,7 @@ def predict(image: Image.Image):
     confidence = float(np.max(preds))
     return CLASS_NAMES[idx], confidence
 
-# --- Groq: Get Recycling Tips ---
+# --- Groq API: Recycling Tips ---
 @st.cache_data
 def get_recycling_tips(waste_category, api_key):
     if not api_key:
@@ -128,7 +128,7 @@ for the following type of waste: '{waste_category}'.
         return f"❌ Error fetching tips from Groq API: {e}"
 
 # --- Streamlit UI ---
-st.title("♻️ Automated Waste Classifier + Recycling Tips")
+st.title("♻️ Waste Classifier + Recycling Tips")
 
 uploaded_file = st.file_uploader("📷 Upload an image of waste", type=["jpg", "jpeg", "png"])
 
