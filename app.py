@@ -1,9 +1,9 @@
 import streamlit as st
 import tensorflow as tf
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import GlobalAveragePooling2D, Dense, Dropout
-from tensorflow.keras.applications import MobileNetV2
-from tensorflow.keras import regularizers
+from tensorflow.keras.layers import GlobalAveragePooling2D, Dense, Dropout, BatchNormalization
+from tensorflow.keras.applications import ResNet50
+from tensorflow.keras.regularizers import l2
 from PIL import Image
 import numpy as np
 import os
@@ -12,16 +12,15 @@ from groq import Groq
 
 # --- PAGE CONFIG ---
 st.set_page_config(
-    page_title="♻️ Waste Classifier (MobileNetV2 Transfer Learning)",
+    page_title="♻️ Waste Classifier (ResNet50 Transfer Learning)",
     layout="centered"
 )
 
 # --- SETTINGS ---
-MODEL_PATH = "mobilenet_waste_model.h5"  # Updated path for MobileNetV2 weights
-DRIVE_FILE_ID = "1ES98bX687_X0ZFNMigDKKQ11GRMx7aFJ"
-
-IMG_HEIGHT = 256
-IMG_WIDTH = 256
+MODEL_PATH = "trained_resnet_model.h5"
+DRIVE_FILE_ID = "1zG_6QvXZucGVv_C1cGmYHVsskAvc08am"  # Your ResNet model file ID
+IMG_HEIGHT = 224
+IMG_WIDTH = 224
 NUM_CLASSES = 6
 CLASS_NAMES = ["cardboard", "glass", "metal", "paper", "plastic", "trash"]
 
@@ -39,31 +38,36 @@ def download_model_from_drive(model_path, file_id):
         except Exception as e:
             st.error(f"❌ Failed to download model: {e}")
 
-# --- BUILD TRANSFER LEARNING MODEL (MobileNetV2) ---
+# --- BUILD TRANSFER LEARNING MODEL (Your version) ---
 @st.cache_resource
-def build_transfer_learning_model_mobilenet():
-    base_model = MobileNetV2(
+def build_transfer_learning_model3():
+    base_model = ResNet50(
         input_shape=(IMG_HEIGHT, IMG_WIDTH, 3),
         include_top=False,
         weights='imagenet'
     )
-    base_model.trainable = True  # Fine-tuning all layers
+    base_model.trainable = False  # freeze all layers
+
+    # Fine-tune last 20 layers
+    fine_tune_at = len(base_model.layers) - 20
+    for layer in base_model.layers[fine_tune_at:]:
+        layer.trainable = True
 
     model = Sequential([
         base_model,
         GlobalAveragePooling2D(),
-        Dropout(0.3),
-        Dense(128, activation='relu', kernel_regularizer=regularizers.l2(0.001)),
-        Dropout(0.3),
-        Dense(NUM_CLASSES, activation='softmax', kernel_regularizer=regularizers.l2(0.001))
-    ])
+        BatchNormalization(),
+        Dense(64, activation='relu', kernel_regularizer=l2(0.001)),
+        Dropout(0.5),
+        Dense(NUM_CLASSES, activation='softmax', name='output_layer', kernel_regularizer=l2(0.001))
+    ], name="ResNet50_Transfer_Learning")
     return model
 
 # --- LOAD MODEL + WEIGHTS ---
 @st.cache_resource
 def load_model():
     download_model_from_drive(MODEL_PATH, DRIVE_FILE_ID)
-    model = build_transfer_learning_model_mobilenet()
+    model = build_transfer_learning_model3()
     if not os.path.exists(MODEL_PATH):
         st.error(f"Model weights file not found at {MODEL_PATH}.")
         return None
@@ -75,7 +79,7 @@ def load_model():
         st.error(f"❌ Failed to load model weights: {e}")
         return None
 
-model = load_model()
+model3 = load_model()
 
 # --- IMAGE PREPROCESSING ---
 def preprocess_image(image: Image.Image):
@@ -88,10 +92,10 @@ def preprocess_image(image: Image.Image):
 
 # --- PREDICT ---
 def predict(image: Image.Image):
-    if model is None:
+    if model3 is None:
         return None, None
     img_array = preprocess_image(image)
-    preds = model.predict(img_array)
+    preds = model3.predict(img_array)
     idx = np.argmax(preds)
     confidence = float(np.max(preds))
     return CLASS_NAMES[idx], confidence
@@ -120,7 +124,7 @@ for the following type of waste: '{waste_category}'.
         return f"Error fetching tips from Groq API: {e}"
 
 # --- UI ---
-st.title("♻️ Waste Classifier (MobileNetV2 TL) + Recycling Tips")
+st.title("♻️ Waste Classifier (ResNet50 TL) + Recycling Tips")
 
 uploaded_file = st.file_uploader("Upload an image of waste", type=["jpg", "jpeg", "png"])
 
