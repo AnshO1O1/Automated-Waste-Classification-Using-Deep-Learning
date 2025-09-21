@@ -30,42 +30,20 @@ GROQ_API_KEY = st.secrets.get("API", "")
 
 # --- BUILD TRANSFER LEARNING MODEL (Your version) ---
 @st.cache_resource
-def build_transfer_learning_model3():
-    base_model = MobileNetV2(
-        input_shape=(IMG_HEIGHT, IMG_WIDTH, 3),
-        include_top=False,
-        weights='imagenet'
-    )
-    base_model.trainable = False  # freeze all layers
-
-    # Fine-tune last 20 layers
-    fine_tune_at = len(base_model.layers) - 20
-    for layer in base_model.layers[fine_tune_at:]:
-        layer.trainable = True
-
-    model = Sequential([
-        base_model,
-        GlobalAveragePooling2D(),
-        BatchNormalization(),
-        Dense(64, activation='relu', kernel_regularizer=l2(0.001)),
-        Dropout(0.5),
-        Dense(NUM_CLASSES, activation='softmax', name='output_layer', kernel_regularizer=l2(0.001))
-    ], name="ResNet50_Transfer_Learning")
-    return model
 
 # --- LOAD MODEL + WEIGHTS ---
 @st.cache_resource
+@st.cache_resource
 def load_model():
-    model = build_transfer_learning_model3()
     if not os.path.exists(MODEL_PATH):
-        st.error(f"Model weights file not found at {MODEL_PATH}.")
+        st.error(f"Model file not found at {MODEL_PATH}.")
         return None
     try:
-        model.load_weights(MODEL_PATH)
-        st.success("✅ Model loaded successfully.")
+        model = tf.keras.models.load_model(MODEL_PATH)
+        st.success("✅ Full model loaded successfully.")
         return model
     except Exception as e:
-        st.error(f"❌ Failed to load model weights: {e}")
+        st.error(f"❌ Failed to load model: {e}")
         return None
 
 model3 = load_model()
