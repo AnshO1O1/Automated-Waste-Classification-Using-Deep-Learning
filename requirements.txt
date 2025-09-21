@@ -1,6 +1,6 @@
-tensorflow==2.10.0
-numpy==1.23.5
-h5py==3.7.0
-Pillow==9.4.0
-gdown==4.7.1
-groq==0.4.1
+tensorflow-cpu==2.16.1
+numpy==1.26.4
+h5py==3.11.0
+Pillow>=9.4.0
+gdown
+groq
