@@ -1,6 +1,6 @@
-tensorflow
-numpy
-h5py
-Pillow
+tensorflow==2.10.0
+numpy==1.23.5
+h5py==3.7.0
+Pillow==9.4.0
 gdown
 groq
