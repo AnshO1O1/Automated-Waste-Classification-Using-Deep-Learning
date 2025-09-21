@@ -38,7 +38,7 @@ def download_model_from_drive(model_path, file_id):
         except Exception as e:
             st.error(f"❌ Failed to download model: {e}")
 
-# --- LOAD MODEL + WEIGHTS ---
+# --- LOAD MODEL ---
 @st.cache_resource
 def load_model():
     download_model_from_drive(MODEL_PATH, DRIVE_FILE_ID)
@@ -46,7 +46,14 @@ def load_model():
         st.error(f"Model file not found at {MODEL_PATH}.")
         return None
     try:
-        model = tf.keras.models.load_model(MODEL_PATH, compile=False) # Use compile=False if you're not retraining
+        # Define the custom objects used in the model
+        custom_objects = {
+            'BatchNormalization': tf.keras.layers.BatchNormalization,
+            'l2': tf.keras.regularizers.l2
+        }
+        
+        # Load the model with custom objects
+        model = tf.keras.models.load_model(MODEL_PATH, custom_objects=custom_objects, compile=False)
         st.success("✅ Model loaded successfully.")
         return model
     except Exception as e:
