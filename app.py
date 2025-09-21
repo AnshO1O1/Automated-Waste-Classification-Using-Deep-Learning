@@ -1,7 +1,7 @@
 import streamlit as st
 import tensorflow as tf
-from tensorflow.keras.models import Sequential, Model
-from tensorflow.keras.layers import GlobalAveragePooling2D, Dense, Dropout, BatchNormalization, Lambda, Input
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import GlobalAveragePooling2D, Dense, Dropout, BatchNormalization, Input
 from tensorflow.keras.applications import EfficientNetB0
 from tensorflow.keras.regularizers import l2
 from PIL import Image
@@ -38,13 +38,10 @@ def download_model_from_drive(model_path, file_id):
         except Exception as e:
             st.error(f"❌ Failed to download model: {e}")
 
-# --- BUILD TRANSFER LEARNING MODEL FOR GRAYSCALE INPUT ---
+# --- BUILD TRANSFER LEARNING MODEL ---
 @st.cache_resource
 def build_model():
-    # Input
-    x= Input(shape=(IMG_HEIGHT, IMG_WIDTH, 3))
-    
-    
+    inputs = Input(shape=(IMG_HEIGHT, IMG_WIDTH, 3))
     base_model = EfficientNetB0(
         input_shape=(IMG_HEIGHT, IMG_WIDTH, 3),
         include_top=False,
@@ -56,15 +53,14 @@ def build_model():
     for layer in base_model.layers[-20:]:
         layer.trainable = True
 
-    x = base_model(x)
+    x = base_model(inputs)
     x = GlobalAveragePooling2D()(x)
     x = BatchNormalization()(x)
     x = Dense(64, activation='relu', kernel_regularizer=l2(0.001))(x)
     x = Dropout(0.5)(x)
     outputs = Dense(NUM_CLASSES, activation='softmax', kernel_regularizer=l2(0.001))(x)
     
-    model = Model(inputs=inputs, outputs=outputs, name="EfficientNetB0_Grayscale")
-    
+    model = Model(inputs=inputs, outputs=outputs, name="EfficientNetB0_Classifier")
     return model
 
 # --- LOAD MODEL AND WEIGHTS ---
@@ -85,14 +81,13 @@ def load_model_weights(model_path):
 
 model = load_model_weights(MODEL_PATH)
 
-# --- IMAGE PREPROCESSING FOR GRAYSCALE ---
+# --- IMAGE PREPROCESSING ---
 def preprocess_image(image: Image.Image):
-
+    image = image.convert("RGB")  # Make sure image is 3-channel RGB
     image = image.resize((IMG_WIDTH, IMG_HEIGHT))
     img_array = tf.keras.utils.img_to_array(image)
     img_array = np.expand_dims(img_array, axis=0)
-    # Normalize to [0, 1] (don't use EfficientNet preprocessing for grayscale)
-    img_array = img_array / 255.0
+    img_array = img_array / 255.0  # Normalize to [0, 1]
     return img_array
 
 # --- PREDICTION ---
