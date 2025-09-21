@@ -38,27 +38,19 @@ def download_model_from_drive(model_path, file_id):
         except Exception as e:
             st.error(f"❌ Failed to download model: {e}")
 
-# --- BUILD TRANSFER LEARNING MODEL (Your version) ---
-@st.cache_resource
-
-
-# Load the trained model
-
-
 # --- LOAD MODEL + WEIGHTS ---
 @st.cache_resource
 def load_model():
     download_model_from_drive(MODEL_PATH, DRIVE_FILE_ID)
-    model = tf.keras.models.load_model('trained_resnet_model.h5')
     if not os.path.exists(MODEL_PATH):
-        st.error(f"Model weights file not found at {MODEL_PATH}.")
+        st.error(f"Model file not found at {MODEL_PATH}.")
         return None
     try:
-        model.load_weights(MODEL_PATH)
+        model = tf.keras.models.load_model(MODEL_PATH, compile=False) # Use compile=False if you're not retraining
         st.success("✅ Model loaded successfully.")
         return model
     except Exception as e:
-        st.error(f"❌ Failed to load model weights: {e}")
+        st.error(f"❌ Failed to load model: {e}")
         return None
 
 model3 = load_model()
@@ -89,8 +81,7 @@ def get_recycling_tips(waste_category, api_key):
         return "Groq API Key not configured. Add it to `.streamlit/secrets.toml` as API = 'YOUR_KEY_HERE'."
     try:
         client = Groq(api_key=api_key)
-        prompt = f"""You are an expert environmental advisor. Provide **three short, actionable, and easy-to-follow recycling tips** 
-for the following type of waste: '{waste_category}'.
+        prompt = f"""You are an expert environmental advisor. Provide **three short, actionable, and easy-to-follow recycling tips** for the following type of waste: '{waste_category}'.
 - Use **bullet points** only.
 - Keep each tip **under 50 words**.
 - Make the tips **practical** for households, offices, or small businesses.
@@ -99,7 +90,7 @@ for the following type of waste: '{waste_category}'.
 
         chat_completion = client.chat.completions.create(
             messages=[{"role": "user", "content": prompt}],
-            model="llama-3.3-70b-versatile"
+            model="llama-3.1-70b-versatile"
         )
         return chat_completion.choices[0].message.content
     except Exception as e:
