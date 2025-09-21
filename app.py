@@ -18,15 +18,21 @@ MODEL_PATH = "efficientnet_waste_classifier.h5"
 DRIVE_FILE_ID = "1tVjhrpLA7OzBa2FwymIq6JgxJnanYg6M"
 IMG_HEIGHT, IMG_WIDTH = 224, 224
 CLASS_NAMES = ["cardboard", "glass", "metal", "paper", "plastic", "trash"]
+NUM_CLASSES = 6
 
-# --- Model building function ---
+# --- Model building function (EXACTLY matches your training code) ---
 def build_transfer_learning_model():
     base_model = EfficientNetB0(
-        input_shape=(IMG_HEIGHT, IMG_WIDTH, 3),
+        input_shape=(IMG_HEIGHT, IMG_WIDTH, 3),  # 3 channels for RGB
         include_top=False,
         weights='imagenet'
     )
-    base_model.trainable = False
+    base_model.trainable = False   # freeze all layers initially
+
+    # Fine-tuning: unfreeze last 20 layers
+    fine_tune_at = len(base_model.layers) - 20
+    for layer in base_model.layers[fine_tune_at:]:
+        layer.trainable = True
 
     model = Sequential([
         base_model,
@@ -34,13 +40,13 @@ def build_transfer_learning_model():
         BatchNormalization(),
         Dense(64, activation='relu', kernel_regularizer=l2(0.001)),
         Dropout(0.5),
-        Dense(len(CLASS_NAMES), activation='softmax', name='output_layer', kernel_regularizer=l2(0.001))
+        Dense(NUM_CLASSES, activation='softmax', name='output_layer', kernel_regularizer=l2(0.001))
     ], name="EfficientNetB0_Transfer_Learning")
     return model
 
 # --- Groq API key from secrets ---
 try:
-    GROQ_API_KEY = st.secrets["API"]
+    GROQ_API_KEY = st.secrets["API"]["GROQ_API_KEY"]
 except (KeyError, FileNotFoundError):
     GROQ_API_KEY = ""
 
@@ -62,13 +68,13 @@ def download_model():
 def load_keras_model():
     download_model()
     try:
-        # Build the model architecture first
+        # Build the model architecture first (EXACT match with training)
         model = build_transfer_learning_model()
         
         # Then load the weights
         model.load_weights(MODEL_PATH)
         
-        # Compile the model (optional for inference, but good practice)
+        # Compile the model (same as training)
         model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
         return model
     except Exception as e:
@@ -80,17 +86,20 @@ def load_keras_model():
         """)
         return None
 
-# --- Image preprocessing ---
+# --- Image preprocessing for RGB (3 channels) ---
 def preprocess_image(image: Image.Image):
-    image = image.convert("RGB")
+    """Converts a PIL Image to the format expected by the model."""
+    image = image.convert("RGB")  # Ensure image is in RGB format (3 channels)
     image = image.resize((IMG_WIDTH, IMG_HEIGHT))
     img_array = tf.keras.utils.img_to_array(image)
-    img_array = np.expand_dims(img_array, axis=0)
+    img_array = np.expand_dims(img_array, axis=0) # Create a batch
+    # Use EfficientNet's preprocessing
     img_array = tf.keras.applications.efficientnet.preprocess_input(img_array)
     return img_array
 
 # --- Prediction ---
 def predict(model, image: Image.Image):
+    """Makes a prediction on a given image."""
     if model is None:
         return None, None
     
@@ -106,6 +115,7 @@ def predict(model, image: Image.Image):
 # --- Groq recycling tips ---
 @st.cache_data
 def get_recycling_tips(waste_category: str, api_key: str):
+    """Fetches actionable recycling tips from the Groq API."""
     if not api_key:
         return "⚠️ Groq API Key not configured. Please add it to your Streamlit secrets."
     try:
@@ -137,15 +147,18 @@ model = load_keras_model()
 uploaded_file = st.file_uploader("📷 Choose an image...", type=["jpg", "jpeg", "png"])
 
 if uploaded_file is not None:
+    # Display the uploaded image
     image = Image.open(uploaded_file)
     st.image(image, caption="Uploaded Image", use_column_width=True)
 
+    # Perform prediction
     with st.spinner("🧠 Classifying the item..."):
         label, confidence = predict(model, image)
 
     if label:
         st.success(f"**Prediction:** `{label.capitalize()}` ({confidence*100:.2f}% confidence)")
 
+        # Fetch and display recycling tips
         st.subheader(f"♻️ Recycling Tips for {label.capitalize()}")
         with st.spinner("💬 Generating tips using Groq..."):
             tips = get_recycling_tips(label, GROQ_API_KEY)
