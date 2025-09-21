@@ -46,7 +46,7 @@ def build_transfer_learning_model():
 
 # --- Groq API key from secrets ---
 try:
-    GROQ_API_KEY = st.secrets["API"]["GROQ_API_KEY"]
+    GROQ_API_KEY = st.secrets["API"]
 except (KeyError, FileNotFoundError):
     GROQ_API_KEY = ""
 
