@@ -38,26 +38,45 @@ def download_model_from_drive(model_path, file_id):
         except Exception as e:
             st.error(f"❌ Failed to download model: {e}")
 
-# --- LOAD MODEL ---
+# --- BUILD TRANSFER LEARNING MODEL (Your version) ---
+@st.cache_resource
+def build_transfer_learning_model3():
+    base_model = ResNet50(
+        input_shape=(IMG_HEIGHT, IMG_WIDTH, 3),
+        include_top=False,
+        weights='imagenet'
+    )
+    base_model.trainable = False  # freeze all layers
+
+    # Fine-tune last 20 layers
+    fine_tune_at = len(base_model.layers) - 20
+    for layer in base_model.layers[fine_tune_at:]:
+        layer.trainable = True
+
+    model = Sequential([
+        base_model,
+        GlobalAveragePooling2D(),
+        BatchNormalization(),
+        Dense(64, activation='relu', kernel_regularizer=l2(0.001)),
+        Dropout(0.5),
+        Dense(NUM_CLASSES, activation='softmax', name='output_layer', kernel_regularizer=l2(0.001))
+    ], name="ResNet50_Transfer_Learning")
+    return model
+
+# --- LOAD MODEL + WEIGHTS ---
 @st.cache_resource
 def load_model():
     download_model_from_drive(MODEL_PATH, DRIVE_FILE_ID)
+    model = build_transfer_learning_model3()
     if not os.path.exists(MODEL_PATH):
-        st.error(f"Model file not found at {MODEL_PATH}.")
+        st.error(f"Model weights file not found at {MODEL_PATH}.")
         return None
     try:
-        # Define the custom objects used in the model
-        custom_objects = {
-            'BatchNormalization': tf.keras.layers.BatchNormalization,
-            'l2': tf.keras.regularizers.l2
-        }
-        
-        # Load the model with custom objects
-        model = tf.keras.models.load_model(MODEL_PATH, custom_objects=custom_objects, compile=False)
+        model.load_weights(MODEL_PATH)
         st.success("✅ Model loaded successfully.")
         return model
     except Exception as e:
-        st.error(f"❌ Failed to load model: {e}")
+        st.error(f"❌ Failed to load model weights: {e}")
         return None
 
 model3 = load_model()
@@ -88,7 +107,8 @@ def get_recycling_tips(waste_category, api_key):
         return "Groq API Key not configured. Add it to `.streamlit/secrets.toml` as API = 'YOUR_KEY_HERE'."
     try:
         client = Groq(api_key=api_key)
-        prompt = f"""You are an expert environmental advisor. Provide **three short, actionable, and easy-to-follow recycling tips** for the following type of waste: '{waste_category}'.
+        prompt = f"""You are an expert environmental advisor. Provide **three short, actionable, and easy-to-follow recycling tips** 
+for the following type of waste: '{waste_category}'.
 - Use **bullet points** only.
 - Keep each tip **under 50 words**.
 - Make the tips **practical** for households, offices, or small businesses.
@@ -97,7 +117,7 @@ def get_recycling_tips(waste_category, api_key):
 
         chat_completion = client.chat.completions.create(
             messages=[{"role": "user", "content": prompt}],
-            model="llama-3.1-70b-versatile"
+            model="llama-3.3-70b-versatile"
         )
         return chat_completion.choices[0].message.content
     except Exception as e:
