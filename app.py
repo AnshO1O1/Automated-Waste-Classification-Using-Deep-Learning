@@ -54,7 +54,7 @@ def preprocess_image(image: Image.Image):
     img_array = tf.keras.utils.img_to_array(image)
     img_array = np.expand_dims(img_array, axis=0)
     img_array = img_array / 255.0
-    return image
+    return img_array
 
 # --- PREDICT ---
 def predict(image: Image.Image):
