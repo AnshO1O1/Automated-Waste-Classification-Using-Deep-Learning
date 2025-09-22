@@ -17,7 +17,7 @@ st.set_page_config(
 )
 
 # --- SETTINGS ---
-MODEL_PATH = "waste_classifier_mobilenetv2.h5"
+MODEL_PATH = "waste_classifier_mobilenet.h5"
 
 IMG_HEIGHT = 224
 IMG_WIDTH = 224
@@ -53,7 +53,7 @@ def preprocess_image(image: Image.Image):
     image = image.resize((IMG_WIDTH, IMG_HEIGHT))
     img_array = tf.keras.utils.img_to_array(image)
     img_array = np.expand_dims(img_array, axis=0)
-    img_array = img_array / 255.0
+    #img_array = img_array / 255.0
     return img_array
 
 # --- PREDICT ---
