@@ -51,7 +51,7 @@ model3 = load_model()
 def preprocess_image(image: Image.Image):
     image = image.convert("RGB")
     image = image.resize((IMG_WIDTH, IMG_HEIGHT))
-    img_array = tf.keras.utils.img_to_array(image)
+    #img_array = tf.keras.utils.img_to_array(image)
     #img_array = np.expand_dims(img_array, axis=0)
     #img_array = img_array / 255.0
     return img_array
