@@ -17,7 +17,7 @@ st.set_page_config(
 )
 
 # --- SETTINGS ---
-MODEL_PATH = "trained_MobileNet_model.h5"
+MODEL_PATH = "best_MobileNet.h5"
 
 IMG_HEIGHT = 224
 IMG_WIDTH = 224
